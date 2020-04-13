@@ -1,17 +1,13 @@
 """
-Reference and credit:
-https://www.youtube.com/watch?v=UlJzzLYgYoE
-
-Q-learning Agent with the action value function parameterize by a ConvNet
+Policy Gradient Agent
 """
 
 import numpy as np
 import torch
-from deep_q_network import DeepQNetwork_CNN, DeepQNetwork_FC
-from replay_mem import ReplayBuffer
+from policy_network import PolicyNetwork_FC
 
 
-class DQNAgent(object):
+class REINFORCEAgent(object):
     def __init__(self, gamma, epsilon, lr, n_actions, input_dims,
                  mem_size, batch_size, eps_min=0.01, eps_dec=5e-4,
                  replace=1000, algo=None, env_name=None, checkpoint_dir='tmp/dqn'):
@@ -54,12 +50,12 @@ class DQNAgent(object):
         self.memory = ReplayBuffer(mem_size, input_dims, n_actions)
 
         # current Q network
-        self.q_eval = DeepQNetwork_FC(self.lr, self.n_actions,
+        self.q_eval = PolicyNetwork_FC(self.lr, self.n_actions,
                                        input_dims=self.input_dims,
                                        name=self.env_name+'_'+self.algo+'_q_eval',
                                        cheakpoint_dir=self.checkpoint)
         # next Q network
-        self.q_next = DeepQNetwork_FC(self.lr, self.n_actions,
+        self.q_next = PolicyNetwork_FC(self.lr, self.n_actions,
                                        input_dims=self.input_dims,
                                        name=self.env_name+'_'+self.algo+'_q_next',
                                        cheakpoint_dir=self.checkpoint)

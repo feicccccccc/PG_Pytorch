@@ -1,16 +1,22 @@
 """
 Reference and credit:
-https://www.youtube.com/watch?v=UlJzzLYgYoE
+https://lilianweng.github.io/lil-log/2018/04/08/policy-gradient-algorithms.html
 
-Main loop
-Slightly change to the network layer structure and parameter naming
-Change gym wrapper and observation
-Add a lot of comment for reference
+General Idea:
+Find the derivative w.r.t. fitness/reward function, and use gradient ascent to find the policy that optimise the reward
+The gradient can be estimated from the experience using policy gradient theorem
+
+Prove of policy gradient theorem is tricky and not trivial since the Value function itself depends on the policy
+Many reference ignore it except this beautiful explanation
+https://lilianweng.github.io/lil-log/2018/04/08/policy-gradient-algorithms.html
+
+grad(J(θ)) = E[Q(s,a) grad(ln π(a|s))]
+
 """
 
 import gym
 import numpy as np
-from agent import DQNAgent
+from agent import REINFORCEAgent
 from utils import plot_learning_curve, make_env
 
 NUMBER_OF_FRAME = 4
@@ -18,7 +24,7 @@ NUMBER_OF_FRAME = 4
 if __name__ == '__main__':
 
     # env = make_env("CartPole-v0")
-    env = gym.make("CartPole-v1")  # same env with different registry
+    env = gym.make("CartPole-v1")  # same env with different registry, terminate reward is larger (500)
 
     init_screen = env.reset()
     best_score = -np.inf
@@ -28,20 +34,12 @@ if __name__ == '__main__':
     initial_epsilon = 0.5
     n_games = 1000  # number of episode
 
-    # replace target network with evaluation network after 1000 step
-    # agent = DQNAgent(gamma=0.99, epsilon=1.0, lr=0.001,
-    #                  input_dims=init_screen.shape,
-    #                  n_actions=env.action_space.n, mem_size=50000, eps_min=0.2,
-    #                  batch_size=64, replace=200, eps_dec=5e-4,
-    #                  checkpoint_dir='models/', algo='DQNAgent',
-    #                  env_name='CartPole-v0-RGB')
-
-    agent = DQNAgent(gamma=0.99, epsilon=initial_epsilon, lr=0.0001,
-                     input_dims=env.observation_space.shape,
-                     n_actions=env.action_space.n, mem_size=50000, eps_min=0.1,
-                     batch_size=128, replace=200, eps_dec=5e-5,
-                     checkpoint_dir='models/', algo='DQNAgent',
-                     env_name='CartPole-v0-FC')
+    agent = REINFORCEAgent(gamma=0.99, epsilon=initial_epsilon, lr=0.0001,
+                           input_dims=env.observation_space.shape,
+                           n_actions=env.action_space.n, mem_size=50000, eps_min=0.1,
+                           batch_size=128, replace=200, eps_dec=5e-5,
+                           checkpoint_dir='models/', algo='REINFORCEAgent',
+                           env_name='CartPole-v0-FC')
 
     if load_checkpoint:
         agent.load_models()
