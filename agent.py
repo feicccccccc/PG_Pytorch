@@ -68,7 +68,7 @@ class REINFORCEAgent(object):
             # Probability of 0.24 to take action 0 and Probability of 0.76 to take action 1
             action_probs = self.policyNetwork.forward(state).detach().numpy()
         # sample the action from the distribution
-        action = np.random.choice(self.action_space, p=action_probs)
+        action = np.random.choice(self.action_space, p=np.squeeze(action_probs))
 
         return action
 
@@ -80,10 +80,11 @@ class REINFORCEAgent(object):
         :return: the discounted reward - mean of the sequence (baseline)
         """
         discounted_rewards = np.zeros_like(rewards)
-        running_add = rewards[len(rewards)]
+        running_add = rewards[len(rewards)-1]
+        discounted_rewards[[len(rewards)-1]] = running_add
         # Reversed in time to get the cumulative discounted reward for each time step
         # G_t = γ * G_t+1 + R_t
-        for t in reversed(range(0, len(rewards))):
+        for t in reversed(range(0, len(rewards) - 1)):
             running_add = self.gamma * running_add + rewards[t]
             discounted_rewards[t] = running_add
 
@@ -98,9 +99,9 @@ class REINFORCEAgent(object):
         :param rewards: reward
         :return: None
         """
-        self.batch_states.append(states)
-        self.batch_rewards.append(self.discounted_rewards(rewards))
-        self.batch_actions.append(actions)
+        self.batch_states.extend(states)
+        self.batch_rewards.extend(self.discounted_rewards(rewards))
+        self.batch_actions.extend(actions)
         self.batch_counter += 1
 
     def save_models(self):
@@ -117,7 +118,7 @@ class REINFORCEAgent(object):
         """
         # if there's not enough batches, do nothing
         # always do in batch
-        if self.batch_counter < self.batch_size:
+        if self.batch_counter <= self.batch_size:
             return
 
         # zero out gradient

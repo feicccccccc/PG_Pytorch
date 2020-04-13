@@ -31,7 +31,7 @@ if __name__ == '__main__':
     init_screen = env.reset()
     best_score = -np.inf
     load_checkpoint = False  # if user want to restart from checkpoint
-    learn = False
+    learn = True
     n_games = 1000  # number of episode
 
     agent = REINFORCEAgent(gamma=0.99, lr=0.0001,
