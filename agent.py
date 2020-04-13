@@ -8,9 +8,8 @@ from policy_network import PolicyNetwork_FC
 
 
 class REINFORCEAgent(object):
-    def __init__(self, gamma, epsilon, lr, n_actions, input_dims,
-                 mem_size, batch_size, eps_min=0.01, eps_dec=5e-4,
-                 replace=1000, algo=None, env_name=None, checkpoint_dir='tmp/dqn'):
+    def __init__(self, gamma, lr, input_dims, n_actions, batch_size,
+                 checkpoint_dir='tmp/dqn', algo=None, env_name=None):
         """
         Init the Agent parameter
         With decaying epsilon-greedy policy
@@ -19,174 +18,136 @@ class REINFORCEAgent(object):
         behavioral policy: epsilon greedy
 
         :param gamma: discount factor
-        :param epsilon: epsilon-greedy policy for the behavioural network
         :param lr: learning rate
         :param n_actions: number of action
         :param input_dims: input dimension
-        :param mem_size: maximum number of experience store inside memory
         :param batch_size: batch size for optimisation
-        :param eps_min: minimum epsilon
-        :param eps_dec: epsilon decay rate
-        :param replace: How many step to update the target policy network
-        :param algo:
+        :param algo: algo name for storing the parameters
         :param env_name: gym env name
         :param checkpoint_dir: dir to save the weight
         """
         self.gamma = gamma
-        self.epsilon = epsilon
         self.lr = lr
         self.n_actions = n_actions
         self.input_dims = input_dims
         self.batch_size = batch_size
-        self.eps_min = eps_min
-        self.eps_dec = eps_dec
-        self.replace_target_counter = replace
         self.algo = algo
         self.env_name = env_name
         self.checkpoint = checkpoint_dir
+
         self.action_space = [i for i in range(n_actions)]
         self.learn_step_counter = 0
 
-        self.memory = ReplayBuffer(mem_size, input_dims, n_actions)
+        # Store batches of trajectory for gradient ascent
+        self.total_rewards = []
+        self.batch_rewards = []
+        self.batch_actions = []
+        self.batch_states = []
+        self.batch_counter = 1
 
         # current Q network
-        self.q_eval = PolicyNetwork_FC(self.lr, self.n_actions,
-                                       input_dims=self.input_dims,
-                                       name=self.env_name+'_'+self.algo+'_q_eval',
-                                       cheakpoint_dir=self.checkpoint)
-        # next Q network
-        self.q_next = PolicyNetwork_FC(self.lr, self.n_actions,
-                                       input_dims=self.input_dims,
-                                       name=self.env_name+'_'+self.algo+'_q_next',
-                                       cheakpoint_dir=self.checkpoint)
+        self.policyNetwork = PolicyNetwork_FC(self.lr, self.n_actions,
+                                              input_dims=self.input_dims,
+                                              name=self.env_name + '_' + self.algo,
+                                              cheakpoint_dir=self.checkpoint)
 
-    def choose_action(self, observation, absolute_greedy=False):
+    def choose_action(self, observation):
         """
         choose action base on the current observation
-        epsilon decay from high to eps_min
-        absolute_greedy flag can turn behavioral policy to target policy, which in general maybe totally different
-        :param absolute_greedy: flag to determine action. Turn behavioural network to target network
+        assume discrete action. can also applied to continuous action which define by the output pdf
+
         :param observation: observation from the env
         :return: the action to take base on epsilon-greedy policy
         """
-        if absolute_greedy:
-            state = torch.tensor([observation], dtype=torch.float).to(self.q_eval.device)
-            with torch.no_grad():
-                actions = self.q_eval.forward(state)
-            action = actions.argmax().item()
-            return action
-
-        if np.random.random() > self.epsilon:
-            # move the observation to the network's device
-            # [] to add batch dimension
-            state = torch.tensor([observation], dtype=torch.float).to(self.q_eval.device)
-            # no need to use autograd since we are going to do it again in experience replay
-            # not optimal but doable
-            with torch.no_grad():
-                actions = self.q_eval.forward(state)
-            # get the indices of the maximum output (probability)
+        # [observation] to add one more dimension
+        state = torch.tensor([observation], dtype=torch.float).to(self.policyNetwork.device)
+        with torch.no_grad():
+            # get the probability of the actions
             # i.e.
-            # a: tensor([0.7875, 0.9929])
-            # a.argmax(): tensor(1)
-            action = actions.argmax().item()
-        else:
-            action = np.random.choice(self.action_space)
+            # [0.24, 0.76]
+            # Probability of 0.24 to take action 0 and Probability of 0.76 to take action 1
+            action_probs = self.policyNetwork.forward(state).detach().numpy()
+        # sample the action from the distribution
+        action = np.random.choice(self.action_space, p=action_probs)
 
         return action
 
-    def store_transition(self, state, action, reward, next_state, done):
+    def discounted_rewards(self, rewards):
+        """
+        Turn the immediate rewards obtain from the sequence into discounted rewards
+
+        :param rewards: observation from the env
+        :return: the discounted reward - mean of the sequence (baseline)
+        """
+        discounted_rewards = np.zeros_like(rewards)
+        running_add = rewards[len(rewards)]
+        # Reversed in time to get the cumulative discounted reward for each time step
+        # G_t = γ * G_t+1 + R_t
+        for t in reversed(range(0, len(rewards))):
+            running_add = self.gamma * running_add + rewards[t]
+            discounted_rewards[t] = running_add
+
+        return discounted_rewards - discounted_rewards.mean()
+
+    def store_trajectory(self, states, actions, rewards):
         """
         Store the transition (s,a,r,s') in memory
-        :param state: observation
-        :param action: action
-        :param reward: reward
-        :param next_state: next observation
-        :param done: terminate state?
+
+        :param states: observation
+        :param actions: action
+        :param rewards: reward
         :return: None
         """
-        self.memory.store_transition(state, action, reward, next_state, done)
-
-    def sample_memory(self):
-        """
-        Sample experience for the experience replay class
-        :return: batches of replay
-        """
-        states, actions, rewards, next_states, terminals = self.memory.sample_buffer(self.batch_size)
-
-        # change the transition to torch tensor for further processing
-        states_tensor = torch.tensor(states).to(self.q_eval.device)
-        rewards_tensor = torch.tensor(rewards).to(self.q_eval.device)
-        # cast to torch.bool to remove warning
-        # TODO: change the original numpy array dtype as well
-        terminals_tensor = torch.tensor(terminals, dtype=torch.bool).to(self.q_eval.device)
-        actions_tensor = torch.tensor(actions).to(self.q_eval.device)
-        next_states_tensor = torch.tensor(next_states).to(self.q_eval.device)
-
-        return states_tensor, actions_tensor, rewards_tensor, next_states_tensor, terminals_tensor
-
-    def replace_target_network(self):
-        """
-        Update the target network occasionally
-        just copying the the behavioral network weight to the target network
-        :return: None
-        """
-        if self.learn_step_counter % self.replace_target_counter == 0:
-            # print("Replacing target network weight with eval network")
-            self.q_next.load_state_dict(self.q_eval.state_dict())
-
-    def decrement_epsilon(self):
-        # hmmm interesting, linear decrement but not exponential decay.
-        # TODO: try exponential decay?
-        self.epsilon = self.epsilon - self.eps_dec if self.epsilon > self.eps_min else self.eps_min
+        self.batch_states.append(states)
+        self.batch_rewards.append(self.discounted_rewards(rewards))
+        self.batch_actions.append(actions)
+        self.batch_counter += 1
 
     def save_models(self):
-        self.q_eval.save_checkpoint()
-        self.q_next.save_checkpoint()
+        self.policyNetwork.save_checkpoint()
 
     def load_models(self):
-        self.q_eval.load_checkpoint()
-        self.q_next.load_checkpoint()
+        self.policyNetwork.load_checkpoint()
 
     def learn(self):
-        # if there's not enough experience, do nothing
+        """
+        Method to learn from the batches
+        Doesn't have to be bathces, but it would increase the stability
+        TODO: Try no batches and update every episode
+        """
+        # if there's not enough batches, do nothing
         # always do in batch
-        if self.memory.mem_counter < self.batch_size:
+        if self.batch_counter < self.batch_size:
             return
 
         # zero out gradient
-        self.q_eval.optimizer.zero_grad()
-        # Replace the target network occasionally
-        self.replace_target_network()
+        self.policyNetwork.optimizer.zero_grad()
 
         # batches of experience
         # terminals: terminal state flag
-        states, actions, rewards, next_states, terminals = self.sample_memory()
-        indices = np.arange(self.batch_size)
+        batches_states_tensor = torch.tensor(self.batch_states).to(self.policyNetwork.device)
+        batches_actions_tensor = torch.tensor(self.batch_actions).to(self.policyNetwork.device)
+        batches_rewards_tensor = torch.tensor(self.batch_rewards).to(self.policyNetwork.device)
 
-        # Estimate Q value
-        # Get the network output actions value from experience
-        q_pred = self.q_eval.forward(states)[indices, actions]
-        # Bellmen equation
-        # for (s,a,r,s') tuple
-        # Q(s,a) = r + max(a')Q(s',a')
-        # eval on q_next, to avoid updating the target network which may result in local optimal
-        # This part is actually tricky.
-        # If you are looking at the code, you may want to refer to the original paper for more information
-        # why there are two network to eval the Q(s,a)
-        q_next = self.q_next.forward(next_states).max(dim=1)[0]
+        # Calculate the gradient of fitness function by sampling from the gradient of log policy
+        # grad(J(θ)) = E[G_t grad(ln π(a|s))]
+        logprob = torch.log(self.policyNetwork.forward(batches_states_tensor))
+        product = batches_rewards_tensor * logprob[np.arange(len(batches_actions_tensor)), batches_actions_tensor]
 
-        # Change the reward of terminal state to 0
-        q_next[terminals] = 0.0
-        # 1 step look ahead
-        q_target = rewards + self.gamma * q_next
+        # mean for expectation
+        # -1 for gradient ascent
+        loss = -1 * product.mean()
 
-        # learning loss between the TD target and the current estimate
-        loss = self.q_eval.loss(q_pred, q_target.detach())  # no autograd on q_target
         # compute the gradient
         loss.backward()
 
         # update the parameter
-        self.q_eval.optimizer.step()
+        self.policyNetwork.optimizer.step()
         self.learn_step_counter += 1
 
-        self.decrement_epsilon()
+        # reset the batches
+        self.total_rewards = []
+        self.batch_rewards = []
+        self.batch_actions = []
+        self.batch_states = []
+        self.batch_counter = 1

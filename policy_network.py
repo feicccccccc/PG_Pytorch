@@ -36,7 +36,6 @@ class PolicyNetwork_FC(nn.Module):
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
 
-        self.loss = nn.MSELoss()
         # TODO: poor me no GPU, build a colab training script
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
