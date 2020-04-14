@@ -72,7 +72,7 @@ if __name__ == '__main__':
         # Monte carlo update at the end of the episodes
         if learn:
             # store the trajectory
-            agent.store_trajectory(observation, actions, rewards)
+            agent.store_trajectory(states, actions, rewards)
             # learn through the experience (if there's enough batches)
             agent.learn()
 

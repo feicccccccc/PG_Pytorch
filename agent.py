@@ -126,9 +126,9 @@ class REINFORCEAgent(object):
 
         # batches of experience
         # terminals: terminal state flag
-        batches_states_tensor = torch.tensor(self.batch_states).to(self.policyNetwork.device)
-        batches_actions_tensor = torch.tensor(self.batch_actions).to(self.policyNetwork.device)
-        batches_rewards_tensor = torch.tensor(self.batch_rewards).to(self.policyNetwork.device)
+        batches_states_tensor = torch.tensor(self.batch_states, dtype=torch.float).to(self.policyNetwork.device)
+        batches_actions_tensor = torch.tensor(self.batch_actions, dtype=torch.long).to(self.policyNetwork.device)
+        batches_rewards_tensor = torch.tensor(self.batch_rewards, dtype=torch.float).to(self.policyNetwork.device)
 
         # Calculate the gradient of fitness function by sampling from the gradient of log policy
         # grad(J(θ)) = E[G_t grad(ln π(a|s))]
