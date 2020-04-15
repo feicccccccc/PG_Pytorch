@@ -14,6 +14,14 @@ https://lilianweng.github .io/lil-log/2018/04/08/policy-gradient-algorithms.html
 
 grad(J(θ)) = E[Q(s,a) grad(ln π(a|s))]
 
+Observation:
+        Type: Box(4)
+        Num	Observation                 Min         Max
+        0	Cart Position             -4.8            4.8
+        1	Cart Velocity             -Inf            Inf
+        2	Pole Angle                 -24 deg        24 deg
+        3	Pole Velocity At Tip      -Inf            Inf
+
 """
 
 import gym
@@ -28,17 +36,18 @@ if __name__ == '__main__':
     # env = make_env("CartPole-v0")
     env = gym.make("CartPole-v1")  # same env with different registry, terminate reward is larger (500)
 
-    init_screen = env.reset()
+    env.reset()
     best_score = -np.inf
     load_checkpoint = True  # if user want to restart from checkpoint
     learn = True
     n_games = 1000  # number of episode
 
+    # reward shaping to force the agent move toward center
     agent = REINFORCEAgent(gamma=0.99, lr=0.01,
                            input_dims=env.observation_space.shape,
                            n_actions=env.action_space.n, batch_size=8,
                            checkpoint_dir='models/', algo='REINFORCEAgent',
-                           env_name='CartPole-v1-FC')
+                           env_name='CartPole-v1-FC', reward_shaping=True)
 
     if load_checkpoint:
         agent.load_models()

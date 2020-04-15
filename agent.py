@@ -9,7 +9,7 @@ from policy_network import PolicyNetwork_FC
 
 class REINFORCEAgent(object):
     def __init__(self, gamma, lr, input_dims, n_actions, batch_size,
-                 checkpoint_dir='tmp/dqn', algo=None, env_name=None):
+                 checkpoint_dir='tmp/dqn', algo=None, env_name=None, reward_shaping=False):
         """
         Init the Agent parameter
         With decaying epsilon-greedy policy
@@ -25,6 +25,7 @@ class REINFORCEAgent(object):
         :param algo: algo name for storing the parameters
         :param env_name: gym env name
         :param checkpoint_dir: dir to save the weight
+        :param reward_shaping: Shap the reward to force the agent move toward center
         """
         self.gamma = gamma
         self.lr = lr
@@ -34,6 +35,7 @@ class REINFORCEAgent(object):
         self.algo = algo
         self.env_name = env_name
         self.checkpoint = checkpoint_dir
+        self.reward_shaping = reward_shaping
 
         self.action_space = [i for i in range(n_actions)]
         self.learn_step_counter = 0
@@ -95,6 +97,20 @@ class REINFORCEAgent(object):
 
         return discounted_rewards - discounted_rewards.mean()
 
+    @staticmethod
+    def shap_reward(rewards, states):
+        """
+        Turn the immediate rewards obtain from the sequence into discounted rewards
+
+        :param rewards: raw reward from env
+        :param states: observation from the env
+        :return: shaped reward
+        """
+        states = np.array(states)
+        positions = states[:, 0]
+        outputs = np.array(rewards) - 10 * abs(positions)  # higher reward when x_pos close to 0/center
+        return outputs
+
     def store_trajectory(self, states, actions, rewards):
         """
         Store the corresponding action-value estimation (from the full trajectory) with the history
@@ -105,7 +121,11 @@ class REINFORCEAgent(object):
         :return: None
         """
         self.batch_states.extend(states)
-        self.batch_rewards.extend(self.discounted_rewards(rewards))
+        # reward shaping
+        if self.reward_shaping:
+            self.batch_rewards.extend(self.discounted_rewards(self.shap_reward(rewards, states)))
+        else:
+            self.batch_rewards.extend(self.discounted_rewards(rewards))
         self.batch_actions.extend(actions)
         self.batch_counter += 1
 
