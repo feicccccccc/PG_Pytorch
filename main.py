@@ -30,11 +30,11 @@ if __name__ == '__main__':
 
     init_screen = env.reset()
     best_score = -np.inf
-    load_checkpoint = False  # if user want to restart from checkpoint
+    load_checkpoint = True  # if user want to restart from checkpoint
     learn = True
     n_games = 1000  # number of episode
 
-    agent = REINFORCEAgent(gamma=0.99, lr=0.0001,
+    agent = REINFORCEAgent(gamma=0.99, lr=0.01,
                            input_dims=env.observation_space.shape,
                            n_actions=env.action_space.n, batch_size=8,
                            checkpoint_dir='models/', algo='REINFORCEAgent',

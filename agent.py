@@ -90,12 +90,13 @@ class REINFORCEAgent(object):
 
         return discounted_rewards - discounted_rewards.mean()
 
+
     def store_trajectory(self, states, actions, rewards):
         """
-        Store the transition (s,a,r,s') in memory
+        Store the corresponding action-value estimation (from the full trajectory) with the history
 
-        :param states: observation
-        :param actions: action
+        :param states: observations
+        :param actions: actions
         :param rewards: reward
         :return: None
         """
