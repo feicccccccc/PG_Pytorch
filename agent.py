@@ -80,8 +80,8 @@ class REINFORCEAgent(object):
         :return: the discounted reward - mean of the sequence (baseline)
         """
         discounted_rewards = np.zeros_like(rewards)
-        running_add = rewards[len(rewards)-1]
-        discounted_rewards[[len(rewards)-1]] = running_add
+        running_add = rewards[len(rewards) - 1]
+        discounted_rewards[[len(rewards) - 1]] = running_add
         # Reversed in time to get the cumulative discounted reward for each time step
         # G_t = γ * G_t+1 + R_t
         for t in reversed(range(0, len(rewards) - 1)):
@@ -89,7 +89,6 @@ class REINFORCEAgent(object):
             discounted_rewards[t] = running_add
 
         return discounted_rewards - discounted_rewards.mean()
-
 
     def store_trajectory(self, states, actions, rewards):
         """

@@ -24,10 +24,6 @@ class PolicyNetwork_FC(nn.Module):
         self.checkpoint_dir = cheakpoint_dir
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + ".pt")
 
-        """
-        Network structure:
-        3 Layer ConvNet -> 2 Layer FC layer -> output
-        """
         self.fc1 = nn.Linear(input_dims[0], 16)
         self.fc2 = nn.Linear(16, 32)
         self.fc3 = nn.Linear(32, n_actions)
