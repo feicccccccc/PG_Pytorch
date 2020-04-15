@@ -88,6 +88,11 @@ class REINFORCEAgent(object):
             running_add = self.gamma * running_add + rewards[t]
             discounted_rewards[t] = running_add
 
+        # TODO: Actually this is not a proper baseline, which itself depedns on the action
+        # The reward is quite tricky as well,
+        # since number of positive reward is the same as the number of negative reward
+        # which kinda work, since the action that make the sequence longer will have a larger psotive reward
+
         return discounted_rewards - discounted_rewards.mean()
 
     def store_trajectory(self, states, actions, rewards):
