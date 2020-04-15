@@ -133,9 +133,10 @@ class REINFORCEAgent(object):
         # Calculate the gradient of fitness function by sampling from the gradient of log policy
         # grad(J(θ)) = E[G_t grad(ln π(a|s))]
         logprob = torch.log(self.policyNetwork.forward(batches_states_tensor))
+        # Pull the action probability from the network output and times the expected cumulative discounted reward
         product = batches_rewards_tensor * logprob[np.arange(len(batches_actions_tensor)), batches_actions_tensor]
 
-        # mean for expectation
+        # mean for batches
         # -1 for gradient ascent
         loss = -1 * product.mean()
 
