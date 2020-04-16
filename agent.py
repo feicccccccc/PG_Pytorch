@@ -98,9 +98,10 @@ class REINFORCEAgent(object):
         return discounted_rewards - discounted_rewards.mean()
 
     @staticmethod
-    def shap_reward(rewards, states):
+    def shape_reward(rewards, states):
         """
-        Turn the immediate rewards obtain from the sequence into discounted rewards
+        Shape the rewards in order to affect the agent behavior.
+        THe current method try to force the cart move to center, but it seems limit the agent ability to explore
 
         :param rewards: raw reward from env
         :param states: observation from the env
